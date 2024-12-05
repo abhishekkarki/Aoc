@@ -9,3 +9,7 @@
 
 ## if did some changes in the code then rebuild the image 
 `docker stop cpp-container`
+
+
+## compiling the program
+`g++ -std=c++17 part01.cpp -o prog`
