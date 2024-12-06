@@ -13,3 +13,7 @@
 
 ## compiling the program
 `g++ -std=c++17 part01.cpp -o prog`
+
+
+## running contaier with a mount of local address
+`docker run -it --rm -v $(pwd):/app cpp-app`
