@@ -1,180 +1,109 @@
-#include <iostream>
 #include <array>
-#include <vector>
-#include <string>
 #include <fstream>
-#include <algorithm>
+#include <iostream>
+#include <queue>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
-//dijkstra's
-enum dirs {
-    UP,
-    RIGHT,
-    DOWN,
-    LEFT
+const int kGridSize{71};
+
+struct Position {
+  int i, j;
+
+  bool operator==(const Position &other) const {
+    return i == other.i && j == other.j;
+  }
+  bool operator<(const Position &other) const {
+    return i < other.i || (i == other.i && j < other.j);
+  }
 };
 
-struct node {
-    std::array<int, 2> pos;
-    long long dist = 2 << 20;
-    int dir;
-    std::vector<node*> prev = {NULL};
-    bool known_best = 0;
-};
+const std::array<Position, 4> kDirections{{{0, 1}, {-1, 0}, {0, -1}, {1, 0}}};
 
-std::array<int, 2> add_vecs(std::array<int, 2> v1, std::array<int, 2> v2)
-{
-    return {v1[0] + v2[0], v1[1] + v2[1]};
+bool inbounds(const int i, const int j) {
+  return i >= 0 && i < kGridSize && j >= 0 && j < kGridSize;
 }
 
-void print_grid(std::vector<std::vector<char>> grid)
-{
-    for (std::vector<char> line : grid) {
-        for (char ch : line)
-            std::cout << ch;
-        std::cout << '\n';
-    }
-    std::cout << '\n';
+int bfs(const std::unordered_set<int> &corrupted,
+        const std::vector<Position> &frontiers,
+        std::unordered_set<int> &visited, const Position &goal) {
+  std::vector<Position> nextFrontier;
+  for (const auto pos : frontiers) {
+    visited.insert(pos.i * kGridSize + pos.j);
+
+    if (pos == goal) return 1;
+  }
+
+  if (nextFrontier.empty()) return -1;
+
+  return 1 + bfs(corrupted, nextFrontier, visited, goal);
 }
 
-void dfs_fill(std::vector<std::vector<char>> &grid, node* start_node)
-{
-    grid[start_node->pos[0]][start_node->pos[1]] = 'O';
-    for (node* prev : start_node->prev) {
-        if (prev != NULL)
-            dfs_fill(grid, prev);
-    }
-}
+int aStar(const Position &start, const Position &goal,
+          const std::unordered_set<int> &corrupted) {
+  std::unordered_set<int> visited;
+  std::priority_queue<std::tuple<int, int, Position>,
+                      std::vector<std::tuple<int, int, Position>>,
+                      std::greater<>>
+      pq;
 
-int end_unreachable(std::vector<std::vector<char>> grid, int x, int y, char start_dir)
-{
-    std::vector<std::vector<std::array<node, 4>>> all_nodes;
-    for (int i=0; i<grid.size(); i++) {
-        all_nodes.push_back(std::vector<std::array<node, 4>>(grid[0].size()));
-    }
-    for (int i=0; i<grid.size(); i++) {
-        for (int j=0; j<grid[0].size(); j++) {
-            if (grid[i][j] != '#') {
-                for (int k=0; k<4; k++) {
-                    node temp;
-                    temp.pos = {i, j};
-                    temp.dir = k;
-                    all_nodes[i][j][k] = temp;
-                }
-            }
+  std::unordered_map<int, int> inPq;
+
+  pq.push({0, 0, start});
+  inPq[0] = 0;
+  while (!pq.empty()) {
+    const auto [h, cost, pos] = pq.top();
+    visited.insert(pos.i * kGridSize + pos.j);
+
+    pq.pop();
+    if (pos == goal) return cost;
+
+    for (const auto dir : kDirections) {
+      int i{pos.i + dir.i};
+      int j{pos.j + dir.j};
+
+      if (inbounds(i, j) && !corrupted.contains(i * kGridSize + j) &&
+          !visited.contains(i * kGridSize + j)) {
+        int heuristic{std::abs(goal.i - i) + std::abs(goal.j - j)};
+
+        if (!inPq.contains(i * kGridSize + j) ||
+            inPq[i * kGridSize + j] > heuristic + cost + 1) {
+          pq.push({heuristic + cost + 1, cost + 1, {i, j}});
+          inPq[i * kGridSize + j] = heuristic + cost + 1;
         }
+      }
     }
+  }
 
-    all_nodes[x][y][start_dir].dist = 0;
-    all_nodes[x][y][start_dir].known_best = 1;
-
-    std::vector<node*> heap = {&all_nodes[x][y][start_dir]};
-
-    auto cmp = [](node* a, node* b) { return a->dist > b->dist; };
-
-    std::make_heap(heap.begin(), heap.end(), cmp);
-
-    std::array<std::array<int, 2>, 4> moves = {{-1, 0}};
-    moves[1] = {0, 1}; moves[2] = {1, 0}; moves[3] = {0, -1};
-
-    node* curr_node;
-
-    while (heap.size() > 0) {
-        std::pop_heap(heap.begin(), heap.end());
-        curr_node = heap.back();
-        curr_node->known_best = true;
-        if (grid[curr_node->pos[0]][curr_node->pos[1]] == 'E')
-            return false;
-        heap.pop_back();
-
-
-        int left = (curr_node->dir - 1 + 4) % 4;
-        node *left_ptr = &all_nodes[curr_node->pos[0]][curr_node->pos[1]][left];
-        if (std::find(heap.begin(), heap.end(), left_ptr) != heap.end()) {
-            if (left_ptr->dist > curr_node->dist + 0) {
-                left_ptr->dist = curr_node->dist + 0;
-                left_ptr->prev = {curr_node};
-            }
-        } else if (!left_ptr->known_best) {
-            left_ptr->dist = curr_node->dist + 0;
-            left_ptr->dir = left;
-            left_ptr->prev = {curr_node};
-            heap.push_back(left_ptr);
-        }
-
-        int right = (curr_node->dir + 1) % 4;
-        node *right_ptr = &all_nodes[curr_node->pos[0]][curr_node->pos[1]][right];
-        if (std::find(heap.begin(), heap.end(), right_ptr) != heap.end()) {
-            if (right_ptr->dist > curr_node->dist + 0) {
-                right_ptr->dist = curr_node->dist + 0;
-                right_ptr->prev = {curr_node};
-            }
-        } else if (!right_ptr->known_best) {
-            right_ptr->dist = curr_node->dist + 0;
-            right_ptr->dir = right;
-            right_ptr->prev = {curr_node};
-            heap.push_back(right_ptr);
-        }
-
-        std::array<int, 2> continuing_pos = add_vecs(curr_node->pos, moves[curr_node->dir]);
-
-        if (continuing_pos[0] < 0 || continuing_pos[0] >= grid.size() || \
-            continuing_pos[1] < 0 || continuing_pos[1] >= grid[0].size())
-            continue;
-        if (grid[continuing_pos[0]][continuing_pos[1]] != '#') {
-            node *continued_ptr = &all_nodes[continuing_pos[0]][continuing_pos[1]][curr_node->dir];
-            if (std::find(heap.begin(), heap.end(), continued_ptr) != heap.end()) {
-                if (continued_ptr->dist > curr_node->dist + 1) {
-                    continued_ptr->prev = {curr_node};
-                    continued_ptr->dist = curr_node->dist + 1;
-                }
-            } else if (!continued_ptr->known_best) {
-                continued_ptr->dist = curr_node->dist + 1;
-                continued_ptr->dir = curr_node->dir;
-                continued_ptr->prev = {curr_node};
-                heap.push_back(continued_ptr);
-            }
-        }
-
-        std::make_heap(heap.begin(), heap.end(), cmp);
-    }
-    return true;
+  return -1;
 }
 
-std::vector<std::string> split(const std::string& s, const std::string& delimiter) 
-{
-    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
-    std::string token;
-    std::vector<std::string> res;
+int main(int argc, char *argv[]) {
+  if (argc != 2) {
+    std::cerr << "Usage: solution.out <filename>\n";
+    return 1;
+  }
 
-    while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
-        token = s.substr (pos_start, pos_end - pos_start);
-        pos_start = pos_end + delim_len;
-        res.push_back (token);
-    }
+  std::ifstream inf{argv[1]};
 
-    res.push_back (s.substr (pos_start));
-    return res;
-}
+  if (!inf) {
+    std::cerr << "Could not open file: " << argv[1] << "\n";
+    return 2;
+  }
 
-int main()
-{
-    std::string line;
-    std::vector<std::vector<char>> grid;
-    for (int i=0; i<71; i++) {
-        grid.push_back(std::vector<char>(71, '.'));
-    }
-    std::ifstream in("input.txt");
-    int lines_read = 0;
-    grid[70][70] = 'E';
-    while (getline(in, line)){
-        std::vector<std::string> pos = split(line, ",");
-        grid[std::stoi(pos[0])][std::stoi(pos[1])] = '#';
-        lines_read++;
-//        if (end_unreachable(grid, 0, 0, RIGHT))
-//            break;
-//            already bruteforced but misread input
-        if (lines_read == 2877)
-            std::cout << std::stoi(pos[0]) << ',' << std::stoi(pos[1]) << '\n';
-    }
+  std::string line;
+  std::unordered_set<int> corrupted;
+  int i, j;
+  while (std::getline(inf, line)) {
+    size_t sep{line.find(',')};
+    j = std::stoi(line.substr(0, sep));
+    i = std::stoi(line.substr(sep + 1));
+    corrupted.insert(i * kGridSize + j);
+    if (aStar({0, 0}, {70, 70}, corrupted) == -1) break;
+  }
 
+  std::cout << "block: " << j << "," << i << std::endl;
+
+  return 0;
 }
