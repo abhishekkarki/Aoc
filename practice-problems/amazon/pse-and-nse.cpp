@@ -10,7 +10,7 @@ vector<int> previousSmallerElement(vector<int>& arr) {
     stack<int> st;
 
     for (int i = 0; i < n; ++i) {
-        if (!st.empty() && arr[st.top()] >= arr[i]) {
+        while (!st.empty() && arr[st.top()] >= arr[i]) {
             st.pop();
         }
 
