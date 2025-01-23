@@ -1,38 +1,48 @@
 // Group Anagrams
 #include <iostream>
-#include <unordered_map>
 #include <vector>
 #include <string>
+#include <unordered_map>
+#include <algorithm>
+#include <sstream>
 
 using namespace std;
 
 vector<vector<string>> groupAnagrams(vector<string>& strs) {
-    // initialize an unordered map
     unordered_map<string, vector<string>> hashMap;
-
-    for (const auto& s : strs) {
-        vector<int> count(0, 26);
-        
-        for (const auto& c : s) {
-            count.push_back[c - 'a'];
-        }
-        int key = to_string(count[0]);
-
-        for (int i = 1; i < 26; ++i) {
-            key = ',' + to_string(count[i]);
-        }
-        hashMap[key].push_back(s);
-    }
-
     vector<vector<string>> result;
 
-    for (const auto& second : hashMap) {
-        result.push_back(pair.second);
+    for (auto& str : strs) {
+        vector<int> count(26, 0);
+
+        for (auto& ch : str) {
+            count[ch - 'a']++;
+        }
+
+        stringstream keyStream;
+        for (int i = 0; i < 26; ++i) {
+            keyStream << count[i] << ",";
+        }
+        string key = keyStream.str();
+
+        // add the original string in the hashmap under the computed key
+        hashMap[key].push_back(str);
+    }
+    // collect the results from the hashmap
+    for (auto& item : hashMap) {
+        result.push_back(item.second);
     }
     return result;
 }
 
 int main() {
     vector<string> strs = {"eat", "tea", "tan", "ate", "nat", "bat"};
-    groupAnagrams(strs);
+    vector<vector<string>> result = groupAnagrams(strs);
+
+    for (auto i : result) {
+        for (auto j : i) {
+            cout << j << " ";
+        }
+        cout << endl;
+    }
 }
